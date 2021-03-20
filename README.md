@@ -12,3 +12,19 @@ Initial protocol architecture:
     - Each message should include the command type, so that the server can identify it.
  - Initial transport is using TCP (Will later upgrade to TLS)
  - Have some mechanism to swap out the TCP for some mock-able local 'transport'
+
+Messages:
+ - Identify Request
+ - Identify Response
+    - Id: ClientId
+ - List Request
+ - List Response
+    - Others: Array of ClientIds
+ - Relay Request
+    - Dest: Array of ClientIds
+    - Message: Byte array
+ - Relay Response
+    - Array of (ClientId, Status) tuples
+ - Relayed Msg
+    - Source: ClientId
+    - Message: Byte array

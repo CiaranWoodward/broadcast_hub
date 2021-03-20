@@ -10,22 +10,6 @@ type client struct {
 	con *net.Conn
 }
 
-// ClientId type, unique id per client
-type ClientId uint64
-
-// Status value, including success
-type Status int
-
-const (
-	// Successful status
-	SUCCESS Status = iota
-	// ID Not valid
-	INVALID_ID
-)
-
-// ClientStatusMap is a map of clientIDs to their respective status
-type ClientStatusMap map[ClientId]Status
-
 // NewClient creates a new client, for use with the methods in this package
 // Returns pointer to the instantiated client struct
 // When work with the client struct is complete, the 'Close' Method must be called
