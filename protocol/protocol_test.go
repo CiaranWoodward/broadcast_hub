@@ -76,3 +76,24 @@ func TestCborEncoder(t *testing.T) {
 		})
 	}
 }
+
+// Simple loopback test to check everything can be decoded from its encoded form
+// This is based off the CBOR test vector, just doens't check the encoded form matches
+// the expected binary value, as json is less predictable and is only included here for
+// debugging.
+func TestJsonEncoder(t *testing.T) {
+	tc := JsonTranscoder{}
+	for _, testElem := range cborTestVec {
+		t.Run(testElem.name, func(t *testing.T) {
+			// Encode a command message
+			msg := testElem.msg
+			bytes, ok := tc.Encode(msg)
+			assert.True(t, ok)
+
+			// Loop it back, and confirm it is the same as before
+			msgOut, ok := tc.Decode(bytes)
+			assert.True(t, ok)
+			assert.Equal(t, testElem.msg, msgOut)
+		})
+	}
+}
