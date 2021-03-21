@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -52,33 +53,39 @@ var cborTestVec = []cborTestElement{
 	},
 }
 
-// Simple loopback test to check everything can be decoded from its encoded form
+// Simple CBOR loopback test to check everything can be decoded from its encoded form
 func TestCborEncoder(t *testing.T) {
 	tc := CborTranscoder{}
 	for _, testElem := range cborTestVec {
 		t.Run(testElem.name, func(t *testing.T) {
 			// Encode a command message
 			msg := testElem.msg
-			bytes, ok := tc.Encode(msg)
+			encoded, ok := tc.Encode(msg)
 			assert.True(t, ok)
 
 			// Assert it is the correct byte sequence (If byte sequence is included in test vec)
-			fmt.Println(hex.EncodeToString(bytes))
+			fmt.Println(hex.EncodeToString(encoded))
 			if testElem.hexString != "" {
 				exBytes, _ := hex.DecodeString(testElem.hexString)
-				assert.Equal(t, bytes, exBytes)
+				assert.Equal(t, encoded, exBytes)
 			}
 
 			// Loop it back, and confirm it is the same as before
-			msgOut, ok := tc.Decode(bytes)
+			msgOut, ok := tc.Decode(encoded)
 			assert.True(t, ok)
 			assert.Equal(t, testElem.msg, msgOut)
+
+			// And also with the stream decoder
+			sd := NewCborDecoder(bytes.NewReader(encoded))
+			msgOut2, ok := sd.Decode()
+			assert.True(t, ok)
+			assert.Equal(t, testElem.msg, msgOut2)
 		})
 	}
 }
 
-// Simple loopback test to check everything can be decoded from its encoded form
-// This is based off the CBOR test vector, just doens't check the encoded form matches
+// Simple JSON loopback test to check everything can be decoded from its encoded form
+// This is based off the CBOR test vector, just doesn't check the encoded form matches
 // the expected binary value, as json is less predictable and is only included here for
 // debugging.
 func TestJsonEncoder(t *testing.T) {
@@ -87,13 +94,21 @@ func TestJsonEncoder(t *testing.T) {
 		t.Run(testElem.name, func(t *testing.T) {
 			// Encode a command message
 			msg := testElem.msg
-			bytes, ok := tc.Encode(msg)
+			encoded, ok := tc.Encode(msg)
 			assert.True(t, ok)
 
+			fmt.Println(string(encoded))
+
 			// Loop it back, and confirm it is the same as before
-			msgOut, ok := tc.Decode(bytes)
+			msgOut, ok := tc.Decode(encoded)
 			assert.True(t, ok)
 			assert.Equal(t, testElem.msg, msgOut)
+
+			// And also with the stream decoder
+			sd := NewJsonDecoder(bytes.NewReader(encoded))
+			msgOut2, ok := sd.Decode()
+			assert.True(t, ok)
+			assert.Equal(t, testElem.msg, msgOut2)
 		})
 	}
 }

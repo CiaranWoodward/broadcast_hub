@@ -101,3 +101,8 @@ type Transcoder interface {
 	Encode(msgin Message) (msgout []byte, ok bool)
 	Decode(msgin []byte) (msgout Message, ok bool)
 }
+
+// Need to be able to decode messages from stream (stream encoding is not so necessary)
+type Decoder interface {
+	Decode() (msgout Message, ok bool)
+}
