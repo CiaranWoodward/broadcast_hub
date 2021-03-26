@@ -8,7 +8,7 @@ Every message contains:
    - Unique per command-response pair
    - Links response messages to requests (same ID)
  - Map containing the actual command type
-   - The underlying message structure supports combining multiple commands per message, but this is not currently used.
+   - The underlying message structure supports combining multiple commands per message, but this is not currently used in the protocol.
  - optional additional fields based on command ID
 
 Commands:
@@ -42,6 +42,12 @@ const (
 	INVALID_ID
 	// No buffer space remaining
 	NO_BUFFER
+	// Underlying connection error
+	CONNECTION_ERROR
+	// Message encoding error
+	ENCODING_ERROR
+	// Protocol timed out before response was received
+	TIMEOUT
 )
 
 // Version type, only version 1 currently supported
@@ -55,7 +61,7 @@ type ClientStatusMap map[ClientId]Status
 // Message struct is the highest level of message that are sent over the transport
 type Message struct {
 	Version   Version           `json:"bhubver"`
-	MessageId int32             `json:"id"`
+	MessageId uint32            `json:"id"`
 	IdReq     *IdentifyRequest  `json:"ir,omitempty"`
 	IdRes     *IdentifyResponse `json:"IR,omitempty"`
 	ListReq   *ListRequest      `json:"lr,omitempty"`

@@ -6,34 +6,100 @@ package client
 import (
 	"bufio"
 	"net"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/CiaranWoodward/broadcast_hub/msg"
 )
 
 // Client struct - instatiated with the 'NewClient' Function.
 type client struct {
-	tc  msg.Transcoder
-	dc  msg.StreamDecoder
-	con *net.Conn
+	// Message transcoders
+	tc msg.Transcoder
+	dc msg.StreamDecoder
+	// Internal message ID counter (for unique IDs)
+	mid uint32
+	// Internal connection state
+	con net.Conn
+	// Map of message IDs to the channel waiting for the response, and a mutex protecting it
+	mid_map       map[uint32]chan msg.Message
+	mid_map_mutex sync.Mutex
 }
 
 // NewClient creates a new client, for use with the methods in this package
 // Returns pointer to the instantiated client struct
 // When work with the client struct is complete, the 'Close' Method must be called
 // Passes ownership of the Conn to the client, which will handle closing of it (Is this a good idea?)
-func NewClient(con *net.Conn) *client {
+func NewClient(con net.Conn) *client {
 	return &client{
 		tc:  &msg.CborTranscoder{},
-		dc:  msg.NewCborStreamDecoder(bufio.NewReader(*con)),
+		dc:  msg.NewCborStreamDecoder(bufio.NewReader(con)),
+		mid: 0,
 		con: con,
 	}
+}
+
+// Get a new unique message ID. Can be safely accessed by different goroutines.
+func (c *client) getMessageId() uint32 {
+	return atomic.AddUint32(&c.mid, 1)
+}
+
+func (c *client) addResponseChannel(mid uint32, ch chan msg.Message) {
+	c.mid_map_mutex.Lock()
+	c.mid_map[mid] = ch
+	c.mid_map_mutex.Unlock()
+}
+
+func (c *client) removeResponseChannel(mid uint32) {
+	c.mid_map_mutex.Lock()
+	delete(c.mid_map, mid)
+	c.mid_map_mutex.Unlock()
 }
 
 // Identity Message
 // GetClientId gets the ID of the client from the server.
 // Returns a channel that will have this client's ID sent into it
-func (*client) GetClientId() (clientid msg.ClientId, status msg.Status) {
-	return 1, msg.SUCCESS
+func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
+	// Form the message
+	mid := c.getMessageId()
+	req := msg.Message{
+		Version:   msg.MyVersion,
+		MessageId: mid,
+		IdReq:     &msg.IdentifyRequest{},
+	}
+
+	// Create a channel for receiving the response. Defer cleaning it up.
+	rsp_chan := make(chan msg.Message)
+	c.addResponseChannel(mid, rsp_chan)
+	defer c.removeResponseChannel(mid)
+
+	//Encode the request and send it over the connection
+	encoded_req, ok := c.tc.Encode(req)
+	if !ok {
+		return 0, msg.ENCODING_ERROR
+	}
+	n, err := c.con.Write(encoded_req)
+	if (err != nil) || (n != len(encoded_req)) {
+		return 0, msg.CONNECTION_ERROR
+	}
+
+	// Wait for response, or time out
+	for {
+		select {
+		case rsp, ok := <-rsp_chan:
+			if !ok {
+				return 0, msg.CONNECTION_ERROR
+			}
+			if rsp.IdRes == nil {
+				return 0, msg.ENCODING_ERROR
+			}
+			return rsp.IdRes.Id, msg.SUCCESS
+
+		case <-time.After(5 * time.Second):
+			return 0, msg.TIMEOUT
+		}
+	}
 }
 
 // List Message
