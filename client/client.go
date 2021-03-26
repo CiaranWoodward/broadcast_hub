@@ -33,10 +33,11 @@ type client struct {
 // Passes ownership of the Conn to the client, which will handle closing of it (Is this a good idea?)
 func NewClient(con net.Conn) *client {
 	c := client{
-		tc:  &msg.CborTranscoder{},
-		dc:  msg.NewCborStreamDecoder(bufio.NewReader(con)),
-		mid: 0,
-		con: con,
+		tc:      &msg.CborTranscoder{},
+		dc:      msg.NewCborStreamDecoder(bufio.NewReader(con)),
+		mid:     0,
+		con:     con,
+		mid_map: make(map[uint32]chan msg.Message),
 	}
 	c.startDispatcher()
 	return &c
