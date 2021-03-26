@@ -43,6 +43,41 @@ func TestClientIdReq(t *testing.T) {
 	assert.Equal(t, msg.ClientId(1234), cid)
 }
 
+func TestClientListReq(t *testing.T) {
+	cli, ser := net.Pipe()
+
+	// Fake server to receive ID request, verify it, and send a response
+	go func() {
+		sd := msg.NewCborStreamDecoder(ser)
+		en := msg.CborTranscoder{}
+		m, ok := sd.DecodeNext()
+		assert.True(t, ok)
+		assert.Equal(t, msg.MyVersion, m.Version)
+		assert.Nil(t, m.IdReq)
+		assert.Nil(t, m.IdRes)
+		assert.NotNil(t, m.ListReq)
+		assert.Nil(t, m.ListRes)
+		assert.Nil(t, m.RelayReq)
+		assert.Nil(t, m.RelayRes)
+		assert.Nil(t, m.RelayInd)
+		rsp := msg.Message{
+			Version:   msg.MyVersion,
+			MessageId: m.MessageId,
+			ListRes:   &msg.ListResponse{Others: []msg.ClientId{1, 2, 3, 4, 5}},
+		}
+		rspb, ok := en.Encode(rsp)
+		assert.True(t, ok)
+		n, err := ser.Write(rspb)
+		assert.Equal(t, len(rspb), n)
+		assert.Nil(t, err)
+	}()
+
+	tc := NewClient(cli)
+	cids, status := tc.ListOtherClients()
+	assert.Equal(t, msg.SUCCESS, status)
+	assert.Equal(t, []msg.ClientId{1, 2, 3, 4, 5}, cids)
+}
+
 func TestClientIdConnBreak(t *testing.T) {
 	cli, ser := net.Pipe()
 

@@ -59,7 +59,10 @@ func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 	defer c.removeResponseChannel(mid)
 
 	//Encode the request and send it over the connection
-	c.sendMessage(req)
+	status = c.sendMessage(req)
+	if status != msg.SUCCESS {
+		return 0, status
+	}
 
 	// Wait for response, or time out
 	for {
@@ -82,9 +85,45 @@ func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 // List Message
 // ListOtherClients gets a list of all other nodes connected to the server.
 // Returns a channel that will have the other client IDs individually streamed into it
-func (*client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
-	//TODO: Stub
-	return []msg.ClientId{}, msg.SUCCESS
+func (c *client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
+	// Form the message
+	clientid = []msg.ClientId{}
+	mid := c.getMessageId()
+	req := msg.Message{
+		Version:   msg.MyVersion,
+		MessageId: mid,
+		ListReq:   &msg.ListRequest{},
+	}
+
+	// Create a channel for receiving the response. Defer cleaning it up.
+	rsp_chan := c.addResponseChannel(mid)
+	defer c.removeResponseChannel(mid)
+
+	//Encode the request and send it over the connection
+	status = c.sendMessage(req)
+	if status != msg.SUCCESS {
+		return
+	}
+
+	// Wait for response, or time out
+	for {
+		select {
+		case rsp, ok := <-rsp_chan:
+			if !ok {
+				status = msg.CONNECTION_ERROR
+				return
+			}
+			if rsp.ListRes == nil {
+				status = msg.ENCODING_ERROR
+				return
+			}
+			return rsp.ListRes.Others, msg.SUCCESS
+
+		case <-time.After(5 * time.Second):
+			status = msg.TIMEOUT
+			return
+		}
+	}
 }
 
 // Relay Message
