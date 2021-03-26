@@ -120,6 +120,7 @@ func (c *client) removeResponseChannel(mid uint32) {
 	c.mid_map_mutex.Unlock()
 }
 
+// Only to be called by dispatcher
 func (c *client) sendToResponseChannel(m msg.Message) {
 	c.mid_map_mutex.Lock()
 	ch := c.mid_map[m.MessageId]
@@ -129,6 +130,7 @@ func (c *client) sendToResponseChannel(m msg.Message) {
 	}
 }
 
+// Only to be called by dispatcher
 func (c *client) closeAllResponseChannels() {
 	c.mid_map_mutex.Lock()
 	for _, ch := range c.mid_map {
@@ -137,6 +139,7 @@ func (c *client) closeAllResponseChannels() {
 	c.mid_map_mutex.Unlock()
 }
 
+// Encode and transmit a message to the server
 func (c *client) sendMessage(m msg.Message) msg.Status {
 	encoded_req, ok := c.tc.Encode(m)
 	if !ok {
@@ -151,9 +154,8 @@ func (c *client) sendMessage(m msg.Message) msg.Status {
 
 func (c *client) startDispatcher() {
 	go func() {
-		// Reader function to pull from
+		// Read messages from the transport, and dispatch them to the relevant requester
 		for {
-			//TODO: Test that cleanup works as expected
 			msgout, ok := c.dc.DecodeNext()
 			if ok {
 				c.sendToResponseChannel(msgout)

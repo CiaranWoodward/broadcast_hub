@@ -72,3 +72,19 @@ func TestClientIdTimeout(t *testing.T) {
 	_, status := tc.GetClientId()
 	assert.Equal(t, msg.TIMEOUT, status)
 }
+
+func TestClientIdCloseMid(t *testing.T) {
+	cli, ser := net.Pipe()
+
+	tc := NewClient(cli)
+	// Goroutine to close the client while it's mid sending the request (after 1 byte has been received)
+	go func() {
+		rcbuf := make([]byte, 1)
+		n, err := ser.Read(rcbuf)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, n)
+		tc.Close()
+	}()
+	_, status := tc.GetClientId()
+	assert.Equal(t, msg.CONNECTION_ERROR, status)
+}
