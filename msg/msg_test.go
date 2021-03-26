@@ -1,4 +1,4 @@
-package protocol
+package msg
 
 import (
 	"bytes"
@@ -76,8 +76,8 @@ func TestCborEncoder(t *testing.T) {
 			assert.Equal(t, testElem.msg, msgOut)
 
 			// And also with the stream decoder
-			sd := NewCborDecoder(bytes.NewReader(encoded))
-			msgOut2, ok := sd.Decode()
+			sd := NewCborStreamDecoder(bytes.NewReader(encoded))
+			msgOut2, ok := sd.DecodeNext()
 			assert.True(t, ok)
 			assert.Equal(t, testElem.msg, msgOut2)
 		})

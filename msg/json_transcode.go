@@ -1,4 +1,4 @@
-package protocol
+package msg
 
 import (
 	"encoding/json"

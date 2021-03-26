@@ -27,7 +27,7 @@ Commands:
     - Source: ClientId
     - Message: Byte array
 */
-package protocol
+package msg
 
 // ClientId type, unique id per client
 type ClientId uint64
@@ -110,6 +110,6 @@ type Transcoder interface {
 }
 
 // Need to be able to decode messages from stream (stream encoding is not so necessary)
-type Decoder interface {
-	Decode() (msgout Message, ok bool)
+type StreamDecoder interface {
+	DecodeNext() (msgout Message, ok bool)
 }

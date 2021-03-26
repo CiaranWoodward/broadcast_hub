@@ -1,4 +1,4 @@
-package protocol
+package msg
 
 import (
 	"io"
@@ -9,7 +9,7 @@ import (
 type CborTranscoder struct {
 }
 
-type CborDecoder struct {
+type CborStreamDecoder struct {
 	dec *cbor.Decoder
 }
 
@@ -25,11 +25,11 @@ func (*CborTranscoder) Decode(msgin []byte) (msgout Message, ok bool) {
 	return
 }
 
-func NewCborDecoder(r io.Reader) *CborDecoder {
-	return &CborDecoder{dec: cbor.NewDecoder(r)}
+func NewCborStreamDecoder(r io.Reader) *CborStreamDecoder {
+	return &CborStreamDecoder{dec: cbor.NewDecoder(r)}
 }
 
-func (cd *CborDecoder) Decode() (msgout Message, ok bool) {
+func (cd *CborStreamDecoder) DecodeNext() (msgout Message, ok bool) {
 	err := cd.dec.Decode(&msgout)
 	ok = (err == nil)
 	return
