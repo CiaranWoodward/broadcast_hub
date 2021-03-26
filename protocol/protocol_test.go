@@ -18,38 +18,38 @@ type cborTestElement struct {
 var cborTestVec = []cborTestElement{
 	{
 		"Identify Request",
-		Message{Version: MyVersion, IdReq: &IdentifyRequest{}},
-		"a2676268756276657201626972a0",
+		Message{Version: MyVersion, MessageId: 0x12, IdReq: &IdentifyRequest{}},
+		"a367626875627665720162696412626972a0",
 	},
 	{
 		"Identify Response",
-		Message{Version: MyVersion, IdRes: &IdentifyResponse{1234}},
-		"a2676268756276657201624952a16269641904d2",
+		Message{Version: MyVersion, MessageId: 0x34, IdRes: &IdentifyResponse{1234}},
+		"a36762687562766572016269641834624952a16269641904d2",
 	},
 	{
 		"List Request",
-		Message{Version: MyVersion, ListReq: &ListRequest{}},
-		"a2676268756276657201626c72a0",
+		Message{Version: MyVersion, MessageId: 0x56, ListReq: &ListRequest{}},
+		"a36762687562766572016269641856626c72a0",
 	},
 	{
 		"List Response",
-		Message{Version: MyVersion, ListRes: &ListResponse{Others: []ClientId{1, 2, 3, 0xFFFFFFFFFFFFFFFF}}},
-		"a2676268756276657201624c52a1616f840102031bffffffffffffffff",
+		Message{Version: MyVersion, MessageId: 0x78, ListRes: &ListResponse{Others: []ClientId{1, 2, 3, 0xFFFFFFFFFFFFFFFF}}},
+		"a36762687562766572016269641878624c52a1616f840102031bffffffffffffffff",
 	},
 	{
 		"Relay Request",
-		Message{Version: MyVersion, RelayReq: &RelayRequest{Dest: []ClientId{1, 2, 3}, Msg: []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB}}},
-		"a2676268756276657201627272a26364737483010203636d7367460123456789ab",
+		Message{Version: MyVersion, MessageId: 0x9A, RelayReq: &RelayRequest{Dest: []ClientId{1, 2, 3}, Msg: []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB}}},
+		"a3676268756276657201626964189a627272a26364737483010203636d7367460123456789ab",
 	},
 	{
 		"Relay Response",
-		Message{Version: MyVersion, RelayRes: &RelayResponse{Status: ClientStatusMap{1: SUCCESS, 2: NO_BUFFER, 3: INVALID_ID}}},
-		"a2676268756276657201625252a16363736da3010002020301",
+		Message{Version: MyVersion, MessageId: 0xBC, RelayRes: &RelayResponse{Status: SUCCESS, StatusMap: ClientStatusMap{2: NO_BUFFER, 3: INVALID_ID}}},
+		"", // No byte comparison as status map is unordered
 	},
 	{
 		"Relay Request",
-		Message{Version: MyVersion, RelayInd: &RelayIndication{Src: 1234, Msg: []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB}}},
-		"a2676268756276657201625249a2637372631904d2636d7367460123456789ab",
+		Message{Version: MyVersion, MessageId: 0xDE, RelayInd: &RelayIndication{Src: 1234, Msg: []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB}}},
+		"a367626875627665720162696418de625249a2637372631904d2636d7367460123456789ab",
 	},
 }
 

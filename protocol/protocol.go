@@ -4,7 +4,11 @@ All of the definitions supported by the bhub protocol
 Every message contains:
  - Map of "bhub-ver" : 1
    - Can be incremented for future versions
- - Command ID
+ - Message ID
+   - Unique per command-response pair
+   - Links response messages to requests (same ID)
+ - Map containing the actual command type
+   - The underlying message structure supports combining multiple commands per message, but this is not currently used.
  - optional additional fields based on command ID
 
 Commands:
@@ -50,14 +54,15 @@ type ClientStatusMap map[ClientId]Status
 
 // Message struct is the highest level of message that are sent over the transport
 type Message struct {
-	Version  Version           `json:"bhubver"`
-	IdReq    *IdentifyRequest  `json:"ir,omitempty"`
-	IdRes    *IdentifyResponse `json:"IR,omitempty"`
-	ListReq  *ListRequest      `json:"lr,omitempty"`
-	ListRes  *ListResponse     `json:"LR,omitempty"`
-	RelayReq *RelayRequest     `json:"rr,omitempty"`
-	RelayRes *RelayResponse    `json:"RR,omitempty"`
-	RelayInd *RelayIndication  `json:"RI,omitempty"`
+	Version   Version           `json:"bhubver"`
+	MessageId int32             `json:"id"`
+	IdReq     *IdentifyRequest  `json:"ir,omitempty"`
+	IdRes     *IdentifyResponse `json:"IR,omitempty"`
+	ListReq   *ListRequest      `json:"lr,omitempty"`
+	ListRes   *ListResponse     `json:"LR,omitempty"`
+	RelayReq  *RelayRequest     `json:"rr,omitempty"`
+	RelayRes  *RelayResponse    `json:"RR,omitempty"`
+	RelayInd  *RelayIndication  `json:"RI,omitempty"`
 }
 
 // IdentifyRequest is a self-identify message request from Client to Hub
@@ -85,8 +90,10 @@ type RelayRequest struct {
 }
 
 // RelayResponse is the response to RelayRequest, containing a status for each client the message was relayed to
+// There is also an overall status field, for the case where the message was not relayed at all
 type RelayResponse struct {
-	Status ClientStatusMap `json:"csm"`
+	Status    Status          `json:"sta"`
+	StatusMap ClientStatusMap `json:"csm"`
 }
 
 // RelayIndication is a message from the hub to a client, containing the source of the message, and the message itself
