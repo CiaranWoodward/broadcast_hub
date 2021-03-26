@@ -45,16 +45,30 @@ func (c *client) getMessageId() uint32 {
 	return atomic.AddUint32(&c.mid, 1)
 }
 
-func (c *client) addResponseChannel(mid uint32, ch chan msg.Message) {
+func (c *client) addResponseChannel(mid uint32) chan msg.Message {
+	ch := make(chan msg.Message)
 	c.mid_map_mutex.Lock()
 	c.mid_map[mid] = ch
 	c.mid_map_mutex.Unlock()
+	return ch
 }
 
 func (c *client) removeResponseChannel(mid uint32) {
 	c.mid_map_mutex.Lock()
 	delete(c.mid_map, mid)
 	c.mid_map_mutex.Unlock()
+}
+
+func (c *client) sendMessage(m msg.Message) msg.Status {
+	encoded_req, ok := c.tc.Encode(m)
+	if !ok {
+		return msg.ENCODING_ERROR
+	}
+	n, err := c.con.Write(encoded_req)
+	if (err != nil) || (n != len(encoded_req)) {
+		return msg.CONNECTION_ERROR
+	}
+	return msg.SUCCESS
 }
 
 // Identity Message
@@ -70,19 +84,11 @@ func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 	}
 
 	// Create a channel for receiving the response. Defer cleaning it up.
-	rsp_chan := make(chan msg.Message)
-	c.addResponseChannel(mid, rsp_chan)
+	rsp_chan := c.addResponseChannel(mid)
 	defer c.removeResponseChannel(mid)
 
 	//Encode the request and send it over the connection
-	encoded_req, ok := c.tc.Encode(req)
-	if !ok {
-		return 0, msg.ENCODING_ERROR
-	}
-	n, err := c.con.Write(encoded_req)
-	if (err != nil) || (n != len(encoded_req)) {
-		return 0, msg.CONNECTION_ERROR
-	}
+	c.sendMessage(req)
 
 	// Wait for response, or time out
 	for {
