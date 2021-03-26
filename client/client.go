@@ -42,6 +42,65 @@ func NewClient(con net.Conn) *client {
 	return &c
 }
 
+// Identity Message
+// GetClientId gets the ID of the client from the server.
+// Returns a channel that will have this client's ID sent into it
+func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
+	// Form the message
+	mid := c.getMessageId()
+	req := msg.Message{
+		Version:   msg.MyVersion,
+		MessageId: mid,
+		IdReq:     &msg.IdentifyRequest{},
+	}
+
+	// Create a channel for receiving the response. Defer cleaning it up.
+	rsp_chan := c.addResponseChannel(mid)
+	defer c.removeResponseChannel(mid)
+
+	//Encode the request and send it over the connection
+	c.sendMessage(req)
+
+	// Wait for response, or time out
+	for {
+		select {
+		case rsp, ok := <-rsp_chan:
+			if !ok {
+				return 0, msg.CONNECTION_ERROR
+			}
+			if rsp.IdRes == nil {
+				return 0, msg.ENCODING_ERROR
+			}
+			return rsp.IdRes.Id, msg.SUCCESS
+
+		case <-time.After(5 * time.Second):
+			return 0, msg.TIMEOUT
+		}
+	}
+}
+
+// List Message
+// ListOtherClients gets a list of all other nodes connected to the server.
+// Returns a channel that will have the other client IDs individually streamed into it
+func (*client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
+	//TODO: Stub
+	return []msg.ClientId{}, msg.SUCCESS
+}
+
+// Relay Message
+// RelayMessage sends a message to be relayed to other clients by the server.
+// Maximum length of the message is 1024 bytes
+// Maximum length of clients is 255
+func (*client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
+	//TODO: Stub
+	return
+}
+
+// Close closes a client, and its associated resources
+func (c *client) Close() {
+	c.con.Close()
+}
+
 // Get a new unique message ID. Can be safely accessed by different goroutines.
 func (c *client) getMessageId() uint32 {
 	return atomic.AddUint32(&c.mid, 1)
@@ -104,63 +163,4 @@ func (c *client) startDispatcher() {
 			}
 		}
 	}()
-}
-
-// Identity Message
-// GetClientId gets the ID of the client from the server.
-// Returns a channel that will have this client's ID sent into it
-func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
-	// Form the message
-	mid := c.getMessageId()
-	req := msg.Message{
-		Version:   msg.MyVersion,
-		MessageId: mid,
-		IdReq:     &msg.IdentifyRequest{},
-	}
-
-	// Create a channel for receiving the response. Defer cleaning it up.
-	rsp_chan := c.addResponseChannel(mid)
-	defer c.removeResponseChannel(mid)
-
-	//Encode the request and send it over the connection
-	c.sendMessage(req)
-
-	// Wait for response, or time out
-	for {
-		select {
-		case rsp, ok := <-rsp_chan:
-			if !ok {
-				return 0, msg.CONNECTION_ERROR
-			}
-			if rsp.IdRes == nil {
-				return 0, msg.ENCODING_ERROR
-			}
-			return rsp.IdRes.Id, msg.SUCCESS
-
-		case <-time.After(5 * time.Second):
-			return 0, msg.TIMEOUT
-		}
-	}
-}
-
-// List Message
-// ListOtherClients gets a list of all other nodes connected to the server.
-// Returns a channel that will have the other client IDs individually streamed into it
-func (*client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
-	//TODO: Stub
-	return []msg.ClientId{}, msg.SUCCESS
-}
-
-// Relay Message
-// RelayMessage sends a message to be relayed to other clients by the server.
-// Maximum length of the message is 1024 bytes
-// Maximum length of clients is 255
-func (*client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
-	//TODO: Stub
-	return
-}
-
-// Close closes a client, and its associated resources
-func (c *client) Close() {
-	c.con.Close()
 }
