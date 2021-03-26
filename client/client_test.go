@@ -42,3 +42,33 @@ func TestClientIdReq(t *testing.T) {
 	assert.Equal(t, msg.SUCCESS, status)
 	assert.Equal(t, msg.ClientId(1234), cid)
 }
+
+func TestClientIdConnBreak(t *testing.T) {
+	cli, ser := net.Pipe()
+
+	// Fake server to receive ID request, then terminate connection
+	go func() {
+		sd := msg.NewCborStreamDecoder(ser)
+		sd.DecodeNext()
+		// We received the message, terminate the connection while the client is waiting for response!
+		ser.Close()
+	}()
+
+	tc := NewClient(cli)
+	_, status := tc.GetClientId()
+	assert.Equal(t, msg.CONNECTION_ERROR, status)
+}
+
+func TestClientIdTimeout(t *testing.T) {
+	cli, ser := net.Pipe()
+
+	// Fake server to receive ID request, but not respond
+	go func() {
+		sd := msg.NewCborStreamDecoder(ser)
+		sd.DecodeNext()
+	}()
+
+	tc := NewClient(cli)
+	_, status := tc.GetClientId()
+	assert.Equal(t, msg.TIMEOUT, status)
+}

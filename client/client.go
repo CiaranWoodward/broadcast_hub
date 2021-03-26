@@ -4,7 +4,6 @@ Package client implements the user-facing API of a broadcast_hub client.
 package client
 
 import (
-	"bufio"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -34,7 +33,7 @@ type client struct {
 func NewClient(con net.Conn) *client {
 	c := client{
 		tc:      &msg.CborTranscoder{},
-		dc:      msg.NewCborStreamDecoder(bufio.NewReader(con)),
+		dc:      msg.NewCborStreamDecoder(con),
 		mid:     0,
 		con:     con,
 		mid_map: make(map[uint32]chan msg.Message),
@@ -71,6 +70,14 @@ func (c *client) sendToResponseChannel(m msg.Message) {
 	}
 }
 
+func (c *client) closeAllResponseChannels() {
+	c.mid_map_mutex.Lock()
+	for _, ch := range c.mid_map {
+		close(ch)
+	}
+	c.mid_map_mutex.Unlock()
+}
+
 func (c *client) sendMessage(m msg.Message) msg.Status {
 	encoded_req, ok := c.tc.Encode(m)
 	if !ok {
@@ -92,6 +99,7 @@ func (c *client) startDispatcher() {
 			if ok {
 				c.sendToResponseChannel(msgout)
 			} else {
+				c.closeAllResponseChannels()
 				break
 			}
 		}
