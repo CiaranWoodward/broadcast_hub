@@ -32,12 +32,14 @@ type client struct {
 // When work with the client struct is complete, the 'Close' Method must be called
 // Passes ownership of the Conn to the client, which will handle closing of it (Is this a good idea?)
 func NewClient(con net.Conn) *client {
-	return &client{
+	c := client{
 		tc:  &msg.CborTranscoder{},
 		dc:  msg.NewCborStreamDecoder(bufio.NewReader(con)),
 		mid: 0,
 		con: con,
 	}
+	c.startDispatcher()
+	return &c
 }
 
 // Get a new unique message ID. Can be safely accessed by different goroutines.
@@ -59,6 +61,15 @@ func (c *client) removeResponseChannel(mid uint32) {
 	c.mid_map_mutex.Unlock()
 }
 
+func (c *client) sendToResponseChannel(m msg.Message) {
+	c.mid_map_mutex.Lock()
+	ch := c.mid_map[m.MessageId]
+	c.mid_map_mutex.Unlock()
+	if ch != nil {
+		ch <- m
+	}
+}
+
 func (c *client) sendMessage(m msg.Message) msg.Status {
 	encoded_req, ok := c.tc.Encode(m)
 	if !ok {
@@ -69,6 +80,21 @@ func (c *client) sendMessage(m msg.Message) msg.Status {
 		return msg.CONNECTION_ERROR
 	}
 	return msg.SUCCESS
+}
+
+func (c *client) startDispatcher() {
+	go func() {
+		// Reader function to pull from
+		for {
+			//TODO: Test that cleanup works as expected
+			msgout, ok := c.dc.DecodeNext()
+			if ok {
+				c.sendToResponseChannel(msgout)
+			} else {
+				break
+			}
+		}
+	}()
 }
 
 // Identity Message
@@ -122,9 +148,10 @@ func (*client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
 // Maximum length of clients is 255
 func (*client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
 	//TODO: Stub
+	return
 }
 
 // Close closes a client, and its associated resources
 func (c *client) Close() {
-	(*c.con).Close()
+	c.con.Close()
 }

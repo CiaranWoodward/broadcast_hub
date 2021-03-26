@@ -5,6 +5,6 @@ import (
 )
 
 func TestClientBasic(t *testing.T) {
-	tc = client.NewClient()
+	tc := client.NewClient()
 	tc.GetClientId()
 }
