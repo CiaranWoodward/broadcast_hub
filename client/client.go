@@ -13,7 +13,7 @@ import (
 )
 
 // Client struct - instatiated with the 'NewClient' Function.
-type client struct {
+type Client struct {
 	// Message transcoders
 	tc msg.Transcoder
 	dc msg.StreamDecoder
@@ -30,8 +30,8 @@ type client struct {
 // Returns pointer to the instantiated client struct
 // When work with the client struct is complete, the 'Close' Method must be called
 // Passes ownership of the Conn to the client, which will handle closing of it (Is this a good idea?)
-func NewClient(con net.Conn) *client {
-	c := client{
+func NewClient(con net.Conn) *Client {
+	c := Client{
 		tc:      &msg.CborTranscoder{},
 		dc:      msg.NewCborStreamDecoder(con),
 		mid:     0,
@@ -45,18 +45,14 @@ func NewClient(con net.Conn) *client {
 // Identity Message
 // GetClientId gets the ID of the client from the server.
 // Returns a channel that will have this client's ID sent into it
-func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
+func (c *Client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 	// Form the message
-	mid := c.getMessageId()
-	req := msg.Message{
-		Version:   msg.MyVersion,
-		MessageId: mid,
-		IdReq:     &msg.IdentifyRequest{},
-	}
+	req := c.newMessage()
+	req.IdReq = &msg.IdentifyRequest{}
 
 	// Create a channel for receiving the response. Defer cleaning it up.
-	rsp_chan := c.addResponseChannel(mid)
-	defer c.removeResponseChannel(mid)
+	rsp_chan := c.addResponseChannel(req.MessageId)
+	defer c.removeResponseChannel(req.MessageId)
 
 	//Encode the request and send it over the connection
 	status = c.sendMessage(req)
@@ -83,18 +79,14 @@ func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 // List Message
 // ListOtherClients gets a list of all other nodes connected to the server.
 // Returns a channel that will have the other client IDs individually streamed into it
-func (c *client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
+func (c *Client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
 	// Form the message
-	mid := c.getMessageId()
-	req := msg.Message{
-		Version:   msg.MyVersion,
-		MessageId: mid,
-		ListReq:   &msg.ListRequest{},
-	}
+	req := c.newMessage()
+	req.ListReq = &msg.ListRequest{}
 
 	// Create a channel for receiving the response. Defer cleaning it up.
-	rsp_chan := c.addResponseChannel(mid)
-	defer c.removeResponseChannel(mid)
+	rsp_chan := c.addResponseChannel(req.MessageId)
+	defer c.removeResponseChannel(req.MessageId)
 
 	//Encode the request and send it over the connection
 	status = c.sendMessage(req)
@@ -127,23 +119,19 @@ func (c *client) ListOtherClients() (clientid []msg.ClientId, status msg.Status)
 // Maximum length of clients is 255
 // The returned clientStatusMap is only valid if status == SUCCESS
 // The returned clientStatusMap does not include the client IDs of successfully relayed messages - they are ommitted for efficiency
-func (c *client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
+func (c *Client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
 	// Check protocol parameters
 	if len(message) > 1024 || len(clients) > 255 {
 		status = msg.TOO_LONG
 		return
 	}
 	// Form the message
-	mid := c.getMessageId()
-	req := msg.Message{
-		Version:   msg.MyVersion,
-		MessageId: mid,
-		RelayReq:  &msg.RelayRequest{Dest: clients, Msg: message},
-	}
+	req := c.newMessage()
+	req.RelayReq = &msg.RelayRequest{Dest: clients, Msg: message}
 
 	// Create a channel for receiving the response. Defer cleaning it up.
-	rsp_chan := c.addResponseChannel(mid)
-	defer c.removeResponseChannel(mid)
+	rsp_chan := c.addResponseChannel(req.MessageId)
+	defer c.removeResponseChannel(req.MessageId)
 
 	//Encode the request and send it over the connection
 	status = c.sendMessage(req)
@@ -171,16 +159,19 @@ func (c *client) RelayMessage(message []byte, clients []msg.ClientId) (relayStat
 }
 
 // Close closes a client, and its associated resources
-func (c *client) Close() {
+func (c *Client) Close() {
 	c.con.Close()
 }
 
-// Get a new unique message ID. Can be safely accessed by different goroutines.
-func (c *client) getMessageId() uint32 {
-	return atomic.AddUint32(&c.mid, 1)
+// Get a new base message with unique message ID. Can be safely accessed by different goroutines.
+func (c *Client) newMessage() msg.Message {
+	return msg.Message{
+		Version:   msg.MyVersion,
+		MessageId: atomic.AddUint32(&c.mid, 1),
+	}
 }
 
-func (c *client) addResponseChannel(mid uint32) chan msg.Message {
+func (c *Client) addResponseChannel(mid uint32) chan msg.Message {
 	ch := make(chan msg.Message)
 	c.mid_map_mutex.Lock()
 	c.mid_map[mid] = ch
@@ -188,14 +179,14 @@ func (c *client) addResponseChannel(mid uint32) chan msg.Message {
 	return ch
 }
 
-func (c *client) removeResponseChannel(mid uint32) {
+func (c *Client) removeResponseChannel(mid uint32) {
 	c.mid_map_mutex.Lock()
 	delete(c.mid_map, mid)
 	c.mid_map_mutex.Unlock()
 }
 
 // Only to be called by dispatcher
-func (c *client) sendToResponseChannel(m msg.Message) {
+func (c *Client) sendToResponseChannel(m msg.Message) {
 	c.mid_map_mutex.Lock()
 	ch := c.mid_map[m.MessageId]
 	c.mid_map_mutex.Unlock()
@@ -205,7 +196,7 @@ func (c *client) sendToResponseChannel(m msg.Message) {
 }
 
 // Only to be called by dispatcher
-func (c *client) closeAllResponseChannels() {
+func (c *Client) closeAllResponseChannels() {
 	c.mid_map_mutex.Lock()
 	for _, ch := range c.mid_map {
 		close(ch)
@@ -214,7 +205,7 @@ func (c *client) closeAllResponseChannels() {
 }
 
 // Encode and transmit a message to the server
-func (c *client) sendMessage(m msg.Message) msg.Status {
+func (c *Client) sendMessage(m msg.Message) msg.Status {
 	encoded_req, ok := c.tc.Encode(m)
 	if !ok {
 		return msg.ENCODING_ERROR
@@ -226,7 +217,7 @@ func (c *client) sendMessage(m msg.Message) msg.Status {
 	return msg.SUCCESS
 }
 
-func (c *client) startDispatcher() {
+func (c *Client) startDispatcher() {
 	go func() {
 		// Read messages from the transport, and dispatch them to the relevant requester
 		for {
