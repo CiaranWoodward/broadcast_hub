@@ -48,6 +48,8 @@ const (
 	ENCODING_ERROR
 	// Protocol timed out before response was received
 	TIMEOUT
+	// One of the parameters is longer than the protocol allows
+	TOO_LONG
 )
 
 // Version type, only version 1 currently supported

@@ -65,20 +65,18 @@ func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 	}
 
 	// Wait for response, or time out
-	for {
-		select {
-		case rsp, ok := <-rsp_chan:
-			if !ok {
-				return 0, msg.CONNECTION_ERROR
-			}
-			if rsp.IdRes == nil {
-				return 0, msg.ENCODING_ERROR
-			}
-			return rsp.IdRes.Id, msg.SUCCESS
-
-		case <-time.After(5 * time.Second):
-			return 0, msg.TIMEOUT
+	select {
+	case rsp, ok := <-rsp_chan:
+		if !ok {
+			return 0, msg.CONNECTION_ERROR
 		}
+		if rsp.IdRes == nil {
+			return 0, msg.ENCODING_ERROR
+		}
+		return rsp.IdRes.Id, msg.SUCCESS
+
+	case <-time.After(5 * time.Second):
+		return 0, msg.TIMEOUT
 	}
 }
 
@@ -87,7 +85,6 @@ func (c *client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 // Returns a channel that will have the other client IDs individually streamed into it
 func (c *client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
 	// Form the message
-	clientid = []msg.ClientId{}
 	mid := c.getMessageId()
 	req := msg.Message{
 		Version:   msg.MyVersion,
@@ -106,23 +103,21 @@ func (c *client) ListOtherClients() (clientid []msg.ClientId, status msg.Status)
 	}
 
 	// Wait for response, or time out
-	for {
-		select {
-		case rsp, ok := <-rsp_chan:
-			if !ok {
-				status = msg.CONNECTION_ERROR
-				return
-			}
-			if rsp.ListRes == nil {
-				status = msg.ENCODING_ERROR
-				return
-			}
-			return rsp.ListRes.Others, msg.SUCCESS
-
-		case <-time.After(5 * time.Second):
-			status = msg.TIMEOUT
+	select {
+	case rsp, ok := <-rsp_chan:
+		if !ok {
+			status = msg.CONNECTION_ERROR
 			return
 		}
+		if rsp.ListRes == nil {
+			status = msg.ENCODING_ERROR
+			return
+		}
+		return rsp.ListRes.Others, msg.SUCCESS
+
+	case <-time.After(5 * time.Second):
+		status = msg.TIMEOUT
+		return
 	}
 }
 
@@ -130,9 +125,49 @@ func (c *client) ListOtherClients() (clientid []msg.ClientId, status msg.Status)
 // RelayMessage sends a message to be relayed to other clients by the server.
 // Maximum length of the message is 1024 bytes
 // Maximum length of clients is 255
-func (*client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
-	//TODO: Stub
-	return
+// The returned clientStatusMap is only valid if status == SUCCESS
+// The returned clientStatusMap does not include the client IDs of successfully relayed messages - they are ommitted for efficiency
+func (c *client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
+	// Check protocol parameters
+	if len(message) > 1024 || len(clients) > 255 {
+		status = msg.TOO_LONG
+		return
+	}
+	// Form the message
+	mid := c.getMessageId()
+	req := msg.Message{
+		Version:   msg.MyVersion,
+		MessageId: mid,
+		RelayReq:  &msg.RelayRequest{Dest: clients, Msg: message},
+	}
+
+	// Create a channel for receiving the response. Defer cleaning it up.
+	rsp_chan := c.addResponseChannel(mid)
+	defer c.removeResponseChannel(mid)
+
+	//Encode the request and send it over the connection
+	status = c.sendMessage(req)
+	if status != msg.SUCCESS {
+		return
+	}
+
+	// Wait for response, or time out
+	select {
+	case rsp, ok := <-rsp_chan:
+		if !ok {
+			status = msg.CONNECTION_ERROR
+			return
+		}
+		if rsp.RelayRes == nil {
+			status = msg.ENCODING_ERROR
+			return
+		}
+		return rsp.RelayRes.StatusMap, rsp.RelayRes.Status
+
+	case <-time.After(5 * time.Second):
+		status = msg.TIMEOUT
+		return
+	}
 }
 
 // Close closes a client, and its associated resources

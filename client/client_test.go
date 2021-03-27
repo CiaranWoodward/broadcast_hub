@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//TODO: Add a test to check that multiple MIDs work correctly (responses go to correct responders)
+
 func TestClientIdReq(t *testing.T) {
 	cli, ser := net.Pipe()
 
@@ -46,7 +48,7 @@ func TestClientIdReq(t *testing.T) {
 func TestClientListReq(t *testing.T) {
 	cli, ser := net.Pipe()
 
-	// Fake server to receive ID request, verify it, and send a response
+	// Fake server to receive List request, verify it, and send a response
 	go func() {
 		sd := msg.NewCborStreamDecoder(ser)
 		en := msg.CborTranscoder{}
@@ -76,6 +78,43 @@ func TestClientListReq(t *testing.T) {
 	cids, status := tc.ListOtherClients()
 	assert.Equal(t, msg.SUCCESS, status)
 	assert.Equal(t, []msg.ClientId{1, 2, 3, 4, 5}, cids)
+}
+
+func TestClientRelayReqReq(t *testing.T) {
+	cli, ser := net.Pipe()
+
+	// Fake server to receive Relay request, verify it, and send a response
+	go func() {
+		sd := msg.NewCborStreamDecoder(ser)
+		en := msg.CborTranscoder{}
+		m, ok := sd.DecodeNext()
+		assert.True(t, ok)
+		assert.Equal(t, msg.MyVersion, m.Version)
+		assert.Nil(t, m.IdReq)
+		assert.Nil(t, m.IdRes)
+		assert.Nil(t, m.ListReq)
+		assert.Nil(t, m.ListRes)
+		assert.NotNil(t, m.RelayReq)
+		assert.Nil(t, m.RelayRes)
+		assert.Nil(t, m.RelayInd)
+		assert.Equal(t, []byte{0x00, 0x11, 0x22, 0x33}, m.RelayReq.Msg)
+		assert.Equal(t, []msg.ClientId{1, 2, 3, 4, 5}, m.RelayReq.Dest)
+		rsp := msg.Message{
+			Version:   msg.MyVersion,
+			MessageId: m.MessageId,
+			RelayRes:  &msg.RelayResponse{Status: msg.SUCCESS, StatusMap: msg.ClientStatusMap{2: msg.INVALID_ID, 3: msg.CONNECTION_ERROR}},
+		}
+		rspb, ok := en.Encode(rsp)
+		assert.True(t, ok)
+		n, err := ser.Write(rspb)
+		assert.Equal(t, len(rspb), n)
+		assert.Nil(t, err)
+	}()
+
+	tc := NewClient(cli)
+	csm, status := tc.RelayMessage([]byte{0x00, 0x11, 0x22, 0x33}, []msg.ClientId{1, 2, 3, 4, 5})
+	assert.Equal(t, msg.SUCCESS, status)
+	assert.Equal(t, msg.ClientStatusMap{2: msg.INVALID_ID, 3: msg.CONNECTION_ERROR}, csm)
 }
 
 func TestClientIdConnBreak(t *testing.T) {
