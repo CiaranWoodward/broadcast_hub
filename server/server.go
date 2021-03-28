@@ -76,7 +76,9 @@ func (s *Server) handleIdRequest(sc *serverClient, mesg *msg.Message) msg.Status
 	rsp := msg.Message{
 		Version:   msg.MyVersion,
 		MessageId: mesg.MessageId,
-		IdRes:     &msg.IdentifyResponse{Id: sc.cid},
+		IdRes: &msg.IdentifyResponse{
+			Id: sc.cid,
+		},
 	}
 	return sc.sendMessage(rsp)
 }
@@ -86,6 +88,9 @@ func (s *Server) handleListRequest(sc *serverClient, mesg *msg.Message) msg.Stat
 	rsp := msg.Message{
 		Version:   msg.MyVersion,
 		MessageId: mesg.MessageId,
+		ListRes: &msg.ListResponse{
+			Others: s.getClientIds(sc.cid),
+		},
 	}
 	return sc.sendMessage(rsp)
 }
@@ -115,6 +120,21 @@ func (s *Server) addClientByConnection(c net.Conn) {
 // Remove a client from server mapping
 func (s *Server) removeClient(cid msg.ClientId) {
 
+}
+
+// Get a new slice of all client IDs, removing the ID of the caller
+func (s *Server) getClientIds(except_cid msg.ClientId) []msg.ClientId {
+	s.clients_mutex.RLock()
+	cids := make([]msg.ClientId, len(s.clients)-1)
+	i := 0
+	for k := range s.clients {
+		if k != except_cid {
+			cids[i] = k
+			i++
+		}
+	}
+	s.clients_mutex.RUnlock()
+	return cids
 }
 
 func (sc *serverClient) sendMessage(m msg.Message) msg.Status {
