@@ -8,10 +8,12 @@ import (
 	"github.com/CiaranWoodward/broadcast_hub/client"
 	"github.com/CiaranWoodward/broadcast_hub/msg"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 func TestServerAndClient(t *testing.T) {
 	// Run through a basic example using both server and client
+	defer goleak.VerifyNone(t)
 
 	// Real Server
 	server := NewServer()
@@ -69,10 +71,13 @@ func TestServerAndClient(t *testing.T) {
 	assert.Equal(t, msg.INVALID_ID, csm[invalid_id])
 
 	wg.Wait()
+	server.Close()
 }
 
 func TestServerListener(t *testing.T) {
 	// Test the listener functionality using a TCP connection
+	defer goleak.VerifyNone(t)
+
 	server := NewServer()
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)}) // Using ephemeral port (0) for server is only suitable for testing.
 	assert.Nil(t, err)

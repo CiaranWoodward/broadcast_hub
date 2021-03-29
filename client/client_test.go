@@ -6,11 +6,13 @@ import (
 
 	"github.com/CiaranWoodward/broadcast_hub/msg"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 //TODO: Add a test to check that multiple MIDs work correctly (responses go to correct responders)
 
 func TestClientIdReq(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	cli, ser := net.Pipe()
 
 	// Fake server to receive ID request, verify it, and send a response
@@ -43,9 +45,11 @@ func TestClientIdReq(t *testing.T) {
 	cid, status := tc.GetClientId()
 	assert.Equal(t, msg.SUCCESS, status)
 	assert.Equal(t, msg.ClientId(1234), cid)
+	tc.Close()
 }
 
 func TestClientListReq(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	cli, ser := net.Pipe()
 
 	// Fake server to receive List request, verify it, and send a response
@@ -78,9 +82,11 @@ func TestClientListReq(t *testing.T) {
 	cids, status := tc.ListOtherClients()
 	assert.Equal(t, msg.SUCCESS, status)
 	assert.Equal(t, []msg.ClientId{1, 2, 3, 4, 5}, cids)
+	tc.Close()
 }
 
 func TestClientRelayReq(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	cli, ser := net.Pipe()
 
 	// Fake server to receive Relay request, verify it, and send a response
@@ -115,9 +121,11 @@ func TestClientRelayReq(t *testing.T) {
 	csm, status := tc.RelayMessage([]byte{0x00, 0x11, 0x22, 0x33}, []msg.ClientId{1, 2, 3, 4, 5})
 	assert.Equal(t, msg.SUCCESS, status)
 	assert.Equal(t, msg.ClientStatusMap{2: msg.INVALID_ID, 3: msg.CONNECTION_ERROR}, csm)
+	tc.Close()
 }
 
 func TestClientRelayInd(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	cli, ser := net.Pipe()
 
 	// Fake server to send the relay indication
@@ -143,9 +151,11 @@ func TestClientRelayInd(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, msg.ClientId(888), mesg.Src)
 	assert.Equal(t, []byte{11, 22, 33}, mesg.Msg)
+	tc.Close()
 }
 
 func TestClientIdConnBreak(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	cli, ser := net.Pipe()
 
 	// Fake server to receive ID request, then terminate connection
@@ -159,9 +169,11 @@ func TestClientIdConnBreak(t *testing.T) {
 	tc := NewClient(cli)
 	_, status := tc.GetClientId()
 	assert.Equal(t, msg.CONNECTION_ERROR, status)
+	tc.Close()
 }
 
 func TestClientIdTimeout(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	cli, ser := net.Pipe()
 
 	// Fake server to receive ID request, but not respond
@@ -173,9 +185,11 @@ func TestClientIdTimeout(t *testing.T) {
 	tc := NewClient(cli)
 	_, status := tc.GetClientId()
 	assert.Equal(t, msg.TIMEOUT, status)
+	tc.Close()
 }
 
 func TestClientIdCloseMid(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	cli, ser := net.Pipe()
 
 	tc := NewClient(cli)
@@ -189,4 +203,5 @@ func TestClientIdCloseMid(t *testing.T) {
 	}()
 	_, status := tc.GetClientId()
 	assert.Equal(t, msg.CONNECTION_ERROR, status)
+	tc.Close()
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/CiaranWoodward/broadcast_hub/client"
 	"github.com/CiaranWoodward/broadcast_hub/msg"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
 
 const (
@@ -44,7 +45,8 @@ func makeSlow(con net.Conn, byte_time time.Duration) net.Conn {
 }
 
 func TestSlowClient(t *testing.T) {
-	// Test that a slow client can still get it's own responses back
+	// Test that a slow client won't be overloaded by fast neighbors
+	defer goleak.VerifyNone(t)
 
 	// Real Server
 	server := NewServer()
@@ -73,7 +75,10 @@ func TestSlowClient(t *testing.T) {
 	// Forever receive all relays into the bitbucket
 	receiver := func(cli *client.Client) {
 		for {
-			<-cli.Relays
+			_, ok := <-cli.Relays
+			if !ok {
+				break
+			}
 		}
 	}
 	go receiver(client_fast)
@@ -121,4 +126,5 @@ func TestSlowClient(t *testing.T) {
 	}
 	assert.True(t, throttled)
 	assert.True(t, recovered)
+	server.Close()
 }

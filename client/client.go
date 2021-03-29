@@ -244,5 +244,6 @@ func (c *Client) startDispatcher() {
 				break
 			}
 		}
+		close(c.Relays)
 	}()
 }
