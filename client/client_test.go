@@ -17,8 +17,8 @@ func TestClientIdReq(t *testing.T) {
 
 	// Fake server to receive ID request, verify it, and send a response
 	go func() {
-		sd := msg.NewCborStreamDecoder(ser)
 		en := msg.CborTranscoder{}
+		sd := en.NewStreamDecoder(ser)
 		m, ok := sd.DecodeNext()
 		assert.True(t, ok)
 		assert.Equal(t, msg.MyVersion, m.Version)
@@ -54,8 +54,8 @@ func TestClientListReq(t *testing.T) {
 
 	// Fake server to receive List request, verify it, and send a response
 	go func() {
-		sd := msg.NewCborStreamDecoder(ser)
 		en := msg.CborTranscoder{}
+		sd := en.NewStreamDecoder(ser)
 		m, ok := sd.DecodeNext()
 		assert.True(t, ok)
 		assert.Equal(t, msg.MyVersion, m.Version)
@@ -91,8 +91,8 @@ func TestClientRelayReq(t *testing.T) {
 
 	// Fake server to receive Relay request, verify it, and send a response
 	go func() {
-		sd := msg.NewCborStreamDecoder(ser)
 		en := msg.CborTranscoder{}
+		sd := en.NewStreamDecoder(ser)
 		m, ok := sd.DecodeNext()
 		assert.True(t, ok)
 		assert.Equal(t, msg.MyVersion, m.Version)
@@ -160,7 +160,8 @@ func TestClientIdConnBreak(t *testing.T) {
 
 	// Fake server to receive ID request, then terminate connection
 	go func() {
-		sd := msg.NewCborStreamDecoder(ser)
+		tc := msg.CborTranscoder{}
+		sd := tc.NewStreamDecoder(ser)
 		sd.DecodeNext()
 		// We received the message, terminate the connection while the client is waiting for response!
 		ser.Close()
@@ -178,7 +179,8 @@ func TestClientIdTimeout(t *testing.T) {
 
 	// Fake server to receive ID request, but not respond
 	go func() {
-		sd := msg.NewCborStreamDecoder(ser)
+		tc := msg.CborTranscoder{}
+		sd := tc.NewStreamDecoder(ser)
 		sd.DecodeNext()
 	}()
 

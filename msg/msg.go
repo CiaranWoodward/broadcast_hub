@@ -37,6 +37,8 @@ Commands (with direction):
 */
 package msg
 
+import "io"
+
 // ClientId type, unique id per client
 type ClientId uint64
 
@@ -125,6 +127,7 @@ type RelayIndication struct {
 type Transcoder interface {
 	Encode(msgin Message) (msgout []byte, ok bool)
 	Decode(msgin []byte) (msgout Message, ok bool)
+	NewStreamDecoder(r io.Reader) StreamDecoder
 }
 
 // The StreamDecoder decodes and de-packetises messages from a stream

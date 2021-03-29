@@ -76,7 +76,7 @@ func TestCborEncoder(t *testing.T) {
 			assert.Equal(t, testElem.msg, msgOut)
 
 			// And also with the stream decoder
-			sd := NewCborStreamDecoder(bytes.NewReader(encoded))
+			sd := tc.NewStreamDecoder(bytes.NewReader(encoded))
 			msgOut2, ok := sd.DecodeNext()
 			assert.True(t, ok)
 			assert.Equal(t, testElem.msg, msgOut2)
@@ -105,8 +105,8 @@ func TestJsonEncoder(t *testing.T) {
 			assert.Equal(t, testElem.msg, msgOut)
 
 			// And also with the stream decoder
-			sd := NewJsonStreamDecoder(bytes.NewReader(encoded))
-			msgOut2, ok := sd.Decode()
+			sd := tc.NewStreamDecoder(bytes.NewReader(encoded))
+			msgOut2, ok := sd.DecodeNext()
 			assert.True(t, ok)
 			assert.Equal(t, testElem.msg, msgOut2)
 		})

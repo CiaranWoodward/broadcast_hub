@@ -40,10 +40,11 @@ type Client struct {
 // When work with the client is complete, the 'Close' Method should be called, which will
 // handle releasing of all resources, including the 'con' argument.
 func NewClient(con net.Conn) *Client {
+	tc := &msg.CborTranscoder{}
 	c := Client{
 		Relays:  make(chan msg.RelayIndication, internalMessageBufferSize),
-		tc:      &msg.CborTranscoder{},
-		dc:      msg.NewCborStreamDecoder(con),
+		tc:      tc,
+		dc:      tc.NewStreamDecoder(con),
 		mid:     0,
 		con:     con,
 		mid_map: make(map[uint32]chan msg.Message),

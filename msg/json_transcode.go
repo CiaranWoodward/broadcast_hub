@@ -25,11 +25,11 @@ func (*JsonTranscoder) Decode(msgin []byte) (msgout Message, ok bool) {
 	return
 }
 
-func NewJsonStreamDecoder(r io.Reader) *jsonDecoder {
+func (*JsonTranscoder) NewStreamDecoder(r io.Reader) StreamDecoder {
 	return &jsonDecoder{dec: json.NewDecoder(r)}
 }
 
-func (jd *jsonDecoder) Decode() (msgout Message, ok bool) {
+func (jd *jsonDecoder) DecodeNext() (msgout Message, ok bool) {
 	err := jd.dec.Decode(&msgout)
 	ok = (err == nil)
 	return

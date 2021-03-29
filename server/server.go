@@ -109,12 +109,13 @@ func (s *Server) AddClientByConnection(c net.Conn) (ok bool) {
 	}
 	// Generate CID, add it to the map, start the dispatcher for it
 	new_cid := msg.ClientId(atomic.AddUint64((*uint64)(&s.cid), 1))
+	tc := &msg.CborTranscoder{}
 	new_sc := serverClient{
 		cid:          new_cid,
 		relayMsgs:    make(chan msg.RelayIndication, maxBufferedMessages),
 		responseMsgs: make(chan msg.Message),
-		tc:           &msg.CborTranscoder{},
-		dc:           msg.NewCborStreamDecoder(c),
+		tc:           tc,
+		dc:           tc.NewStreamDecoder(c),
 		con:          c,
 	}
 	s.clients_mutex.Lock()
@@ -203,6 +204,7 @@ func (s *Server) startSender(sc serverClient) {
 				panic("Failed to clean up serverClient!")
 			}
 		}
+		log.Printf("Removed Client %d\n", sc.cid)
 	}()
 }
 

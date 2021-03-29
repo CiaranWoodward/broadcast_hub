@@ -26,7 +26,7 @@ func (*CborTranscoder) Decode(msgin []byte) (msgout Message, ok bool) {
 	return
 }
 
-func NewCborStreamDecoder(r io.Reader) *cborStreamDecoder {
+func (*CborTranscoder) NewStreamDecoder(r io.Reader) StreamDecoder {
 	return &cborStreamDecoder{dec: cbor.NewDecoder(r)}
 }
 
