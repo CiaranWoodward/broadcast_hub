@@ -1,17 +1,20 @@
 /*
-All of the definitions supported by the bhub protocol
+All of the definitions supported by the bhub protocol.
 
 Every message contains:
- - Map of "bhub-ver" : 1
-   - Can be incremented for future versions
+ - "bhub-ver" = 1
+   - Unique 8 byte string for protocol identification
+   - Version can be incremented for future versions
  - Message ID
    - Unique per command-response pair
    - Links response messages to requests (same ID)
  - Map containing the actual command type
    - The underlying message structure supports combining multiple commands per message, but this is not currently used in the protocol.
- - optional additional fields based on command ID
+ - Additional fields as the 'map' values based on command ID
 
-Commands:
+Commands (with direction):
+ C = Client
+ H = Hub (Server)
  - Identify Request (C->H)
  - Identify Response (C<-H)
     - Id: ClientId
@@ -60,7 +63,8 @@ const MyVersion Version = 1
 // ClientStatusMap is a map of clientIDs to their respective status
 type ClientStatusMap map[ClientId]Status
 
-// Message struct is the highest level of message that are sent over the transport
+// Message is the message that is actually sent over the transport, with
+// subfields to represent all of the other message types.
 type Message struct {
 	Version   Version           `json:"bhubver"`
 	MessageId uint32            `json:"id"`
@@ -73,7 +77,7 @@ type Message struct {
 	RelayInd  *RelayIndication  `json:"RI,omitempty"`
 }
 
-// IdentifyRequest is a self-identify message request from Client to Hub
+// IdentifyRequest is a identify message request from Client to Hub to get its client ID
 type IdentifyRequest struct {
 }
 
@@ -82,7 +86,7 @@ type IdentifyResponse struct {
 	Id ClientId `json:"id"`
 }
 
-// ListRequest is a request from client to hub to identify all other client IDs connected to the hub
+// ListRequest is a request from client to hub to list all other client IDs connected to the hub
 type ListRequest struct {
 }
 
@@ -91,14 +95,15 @@ type ListResponse struct {
 	Others []ClientId `json:"o"`
 }
 
-// RelayRequest is a request from client to hub to request a message to be relayed to all other clients
+// RelayRequest is a request from client to hub to request a message to be relayed to a list of other clients
 type RelayRequest struct {
 	Dest []ClientId `json:"dst"`
 	Msg  []byte     `json:"msg"`
 }
 
 // RelayResponse is the response to RelayRequest, containing a status for each client the message was relayed to
-// There is also an overall status field, for the case where the message was not relayed at all
+// There is also an overall status field, for the case where the message was not relayed at all.
+// The StatusMap does not include successes, so if a Client ID is not present, it can be assumed to be successful.
 type RelayResponse struct {
 	Status    Status          `json:"sta"`
 	StatusMap ClientStatusMap `json:"csm"`
@@ -117,7 +122,7 @@ type Transcoder interface {
 	Decode(msgin []byte) (msgout Message, ok bool)
 }
 
-// Need to be able to decode messages from stream (stream encoding is not so necessary)
+// The StreamDecoder decodes and de-packetises messages from a stream
 type StreamDecoder interface {
 	DecodeNext() (msgout Message, ok bool)
 }

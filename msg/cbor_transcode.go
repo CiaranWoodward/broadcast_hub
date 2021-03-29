@@ -6,10 +6,11 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
+// CBOR Implementation of the Transcoder interface
 type CborTranscoder struct {
 }
 
-type CborStreamDecoder struct {
+type cborStreamDecoder struct {
 	dec *cbor.Decoder
 }
 
@@ -25,11 +26,11 @@ func (*CborTranscoder) Decode(msgin []byte) (msgout Message, ok bool) {
 	return
 }
 
-func NewCborStreamDecoder(r io.Reader) *CborStreamDecoder {
-	return &CborStreamDecoder{dec: cbor.NewDecoder(r)}
+func NewCborStreamDecoder(r io.Reader) *cborStreamDecoder {
+	return &cborStreamDecoder{dec: cbor.NewDecoder(r)}
 }
 
-func (cd *CborStreamDecoder) DecodeNext() (msgout Message, ok bool) {
+func (cd *cborStreamDecoder) DecodeNext() (msgout Message, ok bool) {
 	err := cd.dec.Decode(&msgout)
 	ok = (err == nil)
 	return

@@ -1,5 +1,13 @@
 /*
 Package server implements the user-facing API of a broadcast_hub server.
+
+Example, creating a listening TCP server on port 2593:
+  server := NewServer()
+  listener, err := net.Listen("tcp", ":2593")
+  if err == nil {
+	  server.AddListener(listener)
+  }
+
 */
 package server
 
@@ -38,13 +46,17 @@ type Server struct {
 	clients_mutex sync.RWMutex
 }
 
+// Create a new server, that will act as a hub and allow connected clients to communicate.
+// The server does nothing by itself, and must be either configured to accept new connections
+// with the 'AddListener' function, or individual connections added with the 'AddClientByConnection'
+// function.
 func NewServer() *Server {
 	return &Server{
 		clients: make(map[msg.ClientId]serverClient),
 	}
 }
 
-// Add a listener which will accept new incoming connections automatically
+// Add a listener which will accept new incoming connections from clients automatically.
 func (s *Server) AddListener(l net.Listener) {
 	go func() {
 		for {
@@ -56,6 +68,26 @@ func (s *Server) AddListener(l net.Listener) {
 			s.AddClientByConnection(con)
 		}
 	}()
+}
+
+// Add a new client connection. This is mainly for testing and allowing dual client-server programs.
+func (s *Server) AddClientByConnection(c net.Conn) {
+	// Generate CID, add it to the map, start the dispatcher for it
+	new_cid := msg.ClientId(atomic.AddUint64((*uint64)(&s.cid), 1))
+	new_sc := serverClient{
+		cid:          new_cid,
+		relayMsgs:    make(chan msg.RelayIndication, maxBufferedMessages),
+		responseMsgs: make(chan msg.Message),
+		tc:           &msg.CborTranscoder{},
+		dc:           msg.NewCborStreamDecoder(c),
+		con:          c,
+	}
+	s.clients_mutex.Lock()
+	s.clients[new_cid] = new_sc
+	s.clients_mutex.Unlock()
+	s.startDispatcher(new_sc)
+	s.startSender(new_sc)
+	log.Printf("Added new Client %d\n", new_cid)
 }
 
 // Close the server, and all associated resources and connections
@@ -188,26 +220,6 @@ func (s *Server) sendRelays(sc *serverClient, request *msg.Message) msg.ClientSt
 		}
 	}
 	return statusMap
-}
-
-// Add a new client connection
-func (s *Server) AddClientByConnection(c net.Conn) {
-	// Generate CID, add it to the map, start the dispatcher for it
-	new_cid := msg.ClientId(atomic.AddUint64((*uint64)(&s.cid), 1))
-	new_sc := serverClient{
-		cid:          new_cid,
-		relayMsgs:    make(chan msg.RelayIndication, maxBufferedMessages),
-		responseMsgs: make(chan msg.Message),
-		tc:           &msg.CborTranscoder{},
-		dc:           msg.NewCborStreamDecoder(c),
-		con:          c,
-	}
-	s.clients_mutex.Lock()
-	s.clients[new_cid] = new_sc
-	s.clients_mutex.Unlock()
-	s.startDispatcher(new_sc)
-	s.startSender(new_sc)
-	log.Printf("Added new Client %d\n", new_cid)
 }
 
 // Remove a client from server mapping

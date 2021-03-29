@@ -105,7 +105,7 @@ func TestJsonEncoder(t *testing.T) {
 			assert.Equal(t, testElem.msg, msgOut)
 
 			// And also with the stream decoder
-			sd := NewJsonDecoder(bytes.NewReader(encoded))
+			sd := NewJsonStreamDecoder(bytes.NewReader(encoded))
 			msgOut2, ok := sd.Decode()
 			assert.True(t, ok)
 			assert.Equal(t, testElem.msg, msgOut2)

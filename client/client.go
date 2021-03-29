@@ -12,6 +12,7 @@ import (
 	"github.com/CiaranWoodward/broadcast_hub/msg"
 )
 
+// Length of the buffered channel for holding incoming relays
 const internalMessageBufferSize = 10
 
 // Client struct - instatiated with the 'NewClient' Function.
@@ -30,12 +31,14 @@ type Client struct {
 	mid_map_mutex sync.Mutex
 }
 
-// NewClient creates a new client, for use with the methods in this package
-// Returns pointer to the instantiated client struct
+// NewClient creates a new client, for use with the methods in this package.
+// Returns pointer to the instantiated client.
+//
 // The application should be sure to continually process items in the 'Relays' channel,
 // so as not to fill the internal buffer.
-// When work with the client struct is complete, the 'Close' Method must be called
-// Passes ownership of the Conn to the client, which will handle closing of it (Is this a good idea?)
+//
+// When work with the client is complete, the 'Close' Method should be called, which will
+// handle releasing of all resources, including the 'con' argument.
 func NewClient(con net.Conn) *Client {
 	c := Client{
 		Relays:  make(chan msg.RelayIndication, internalMessageBufferSize),
@@ -49,8 +52,7 @@ func NewClient(con net.Conn) *Client {
 	return &c
 }
 
-// Identity Message
-// GetClientId gets the ID of the client from the server.
+// GetClientId gets the ID of the client from the server. This is the 'Identity Message'.
 // Returns a channel that will have this client's ID sent into it
 func (c *Client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 	// Form the message
@@ -83,8 +85,7 @@ func (c *Client) GetClientId() (clientid msg.ClientId, status msg.Status) {
 	}
 }
 
-// List Message
-// ListOtherClients gets a list of all other nodes connected to the server.
+// ListOtherClients gets a list of all other nodes connected to the server. This is the 'List Message'.
 // Returns a channel that will have the other client IDs individually streamed into it
 func (c *Client) ListOtherClients() (clientid []msg.ClientId, status msg.Status) {
 	// Form the message
@@ -120,12 +121,13 @@ func (c *Client) ListOtherClients() (clientid []msg.ClientId, status msg.Status)
 	}
 }
 
-// Relay Message
-// RelayMessage sends a message to be relayed to other clients by the server.
-// Maximum length of the message is 1024 bytes
-// Maximum length of clients is 255
+// RelayMessage sends a message to be relayed to other clients by the server. This is the 'Relay Message'.
+//
+// Maximum length of the message is 1024 bytes.
+// Maximum length of clients is 255.
+//
 // The returned clientStatusMap is only valid if status == SUCCESS
-// The returned clientStatusMap does not include the client IDs of successfully relayed messages - they are ommitted for efficiency
+// The returned clientStatusMap does not include the client IDs of successfully relayed messages - they are omitted for efficiency
 func (c *Client) RelayMessage(message []byte, clients []msg.ClientId) (relayStatus msg.ClientStatusMap, status msg.Status) {
 	// Check protocol parameters
 	if len(message) > 1024 || len(clients) > 255 {

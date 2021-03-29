@@ -5,10 +5,11 @@ import (
 	"io"
 )
 
+// JSON Implementation of the Transcoder interface
 type JsonTranscoder struct {
 }
 
-type JsonDecoder struct {
+type jsonDecoder struct {
 	dec *json.Decoder
 }
 
@@ -24,11 +25,11 @@ func (*JsonTranscoder) Decode(msgin []byte) (msgout Message, ok bool) {
 	return
 }
 
-func NewJsonDecoder(r io.Reader) *JsonDecoder {
-	return &JsonDecoder{dec: json.NewDecoder(r)}
+func NewJsonStreamDecoder(r io.Reader) *jsonDecoder {
+	return &jsonDecoder{dec: json.NewDecoder(r)}
 }
 
-func (jd *JsonDecoder) Decode() (msgout Message, ok bool) {
+func (jd *jsonDecoder) Decode() (msgout Message, ok bool) {
 	err := jd.dec.Decode(&msgout)
 	ok = (err == nil)
 	return
