@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIdReq(t *testing.T) {
+func TestIdReqAndListReq(t *testing.T) {
 
 	// Real Server running in seperate goroutine
 	server := NewServer()
@@ -36,5 +36,17 @@ func TestIdReq(t *testing.T) {
 		_, exists := cid_set[new_cid]
 		assert.False(t, exists, "Duplicate ID: %d", new_cid)
 		cid_set[new_cid] = struct{}{}
+	}
+
+	// Add a final client that we will use for the list req
+	cli, ser := net.Pipe()
+	server.addClientByConnection(ser)
+	tc := client.NewClient(cli)
+	cids, status := tc.ListOtherClients()
+	assert.Equal(t, msg.SUCCESS, status)
+
+	for _, cid := range cids {
+		_, exists := cid_set[cid]
+		assert.True(t, exists, "ID %d not in returned list", cid)
 	}
 }
