@@ -2,6 +2,7 @@ package server
 
 import (
 	"net"
+	"sync"
 	"testing"
 
 	"github.com/CiaranWoodward/broadcast_hub/client"
@@ -9,7 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIdReqAndListReq(t *testing.T) {
+func TestServerAndClient(t *testing.T) {
+	// Run through a basic example using both server and client
 
 	// Real Server running in seperate goroutine
 	server := NewServer()
@@ -17,8 +19,12 @@ func TestIdReqAndListReq(t *testing.T) {
 
 	// Create 100 clients and connect them in parallel
 	n_clients := 100
+	wg := sync.WaitGroup{}
 	for i := 0; i < n_clients; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
+
 			cli, ser := net.Pipe()
 			server.addClientByConnection(ser)
 			tc := client.NewClient(cli)
@@ -26,6 +32,9 @@ func TestIdReqAndListReq(t *testing.T) {
 			assert.Equal(t, msg.SUCCESS, status)
 			// Output the cid that was obtained for uniqueness checking
 			cid_chan <- cid
+
+			// Verify we can get relay indications
+			assert.Equal(t, []byte{1, 2, 3, 4, 5}, (<-tc.Relays).Msg)
 		}()
 	}
 
@@ -49,4 +58,11 @@ func TestIdReqAndListReq(t *testing.T) {
 		_, exists := cid_set[cid]
 		assert.True(t, exists, "ID %d not in returned list", cid)
 	}
+
+	//Send a relay message to all other clients
+	csm, status := tc.RelayMessage([]byte{1, 2, 3, 4, 5}, cids)
+	assert.Equal(t, msg.SUCCESS, status)
+	assert.Equal(t, len(csm), 0)
+
+	wg.Wait()
 }

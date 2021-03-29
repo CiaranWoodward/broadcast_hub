@@ -176,6 +176,7 @@ func (s *Server) handleRelayRequest(sc *serverClient, mesg *msg.Message) {
 			continue
 		}
 	}
+	sc.responseMsgs <- rsp
 }
 
 // Add a new client connection

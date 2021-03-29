@@ -12,8 +12,12 @@ import (
 	"github.com/CiaranWoodward/broadcast_hub/msg"
 )
 
+const internalMessageBufferSize = 10
+
 // Client struct - instatiated with the 'NewClient' Function.
 type Client struct {
+	// Channel to receive incoming relay indications
+	Relays chan msg.RelayIndication
 	// Message transcoders
 	tc msg.Transcoder
 	dc msg.StreamDecoder
@@ -28,10 +32,13 @@ type Client struct {
 
 // NewClient creates a new client, for use with the methods in this package
 // Returns pointer to the instantiated client struct
+// The application should be sure to continually process items in the 'Relays' channel,
+// so as not to fill the internal buffer.
 // When work with the client struct is complete, the 'Close' Method must be called
 // Passes ownership of the Conn to the client, which will handle closing of it (Is this a good idea?)
 func NewClient(con net.Conn) *Client {
 	c := Client{
+		Relays:  make(chan msg.RelayIndication, internalMessageBufferSize),
 		tc:      &msg.CborTranscoder{},
 		dc:      msg.NewCborStreamDecoder(con),
 		mid:     0,
@@ -188,9 +195,9 @@ func (c *Client) removeResponseChannel(mid uint32) {
 // Only to be called by dispatcher
 func (c *Client) sendToResponseChannel(m msg.Message) {
 	c.mid_map_mutex.Lock()
-	ch := c.mid_map[m.MessageId]
+	ch, ok := c.mid_map[m.MessageId]
 	c.mid_map_mutex.Unlock()
-	if ch != nil {
+	if ok {
 		ch <- m
 	}
 }
@@ -223,7 +230,13 @@ func (c *Client) startDispatcher() {
 		for {
 			msgout, ok := c.dc.DecodeNext()
 			if ok {
-				c.sendToResponseChannel(msgout)
+				if msgout.RelayInd != nil {
+					// Relay indication (This WILL block if the application isn't servicing the channel)
+					c.Relays <- *msgout.RelayInd
+				} else {
+					// Response message
+					c.sendToResponseChannel(msgout)
+				}
 			} else {
 				c.closeAllResponseChannels()
 				break
