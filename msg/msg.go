@@ -12,6 +12,11 @@ Every message contains:
    - The underlying message structure supports combining multiple commands per message, but this is not currently used in the protocol.
  - Additional fields as the 'map' values based on command ID
 
+Terminology:
+ "Request" For an unsolicited message from Client to Hub.
+ "Response" For a reply to a "Request"
+ "Indication" For an unsolicited message from Hub to Client
+
 Commands (with direction):
  C = Client
  H = Hub (Server)
