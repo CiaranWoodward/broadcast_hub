@@ -13,7 +13,7 @@ import (
 func TestServerAndClient(t *testing.T) {
 	// Run through a basic example using both server and client
 
-	// Real Server running in seperate goroutine
+	// Real Server
 	server := NewServer()
 	cid_chan := make(chan msg.ClientId)
 
@@ -65,4 +65,56 @@ func TestServerAndClient(t *testing.T) {
 	assert.Equal(t, len(csm), 0)
 
 	wg.Wait()
+}
+
+func TestServerListener(t *testing.T) {
+	// Test the listener functionality using a TCP connection
+	server := NewServer()
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)}) // Using ephemeral port (0) for server is only suitable for testing.
+	assert.Nil(t, err)
+	serverAddr := listener.Addr().String()
+	server.AddListener(listener)
+
+	n_client := 10
+	wg_setup := sync.WaitGroup{}
+	wg_done := sync.WaitGroup{}
+	wg_setup.Add(n_client)
+	wg_done.Add(n_client)
+	for i := 0; i < n_client; i++ {
+		go func() {
+			defer wg_done.Done()
+
+			conn, err := net.Dial("tcp", serverAddr)
+			assert.Nil(t, err)
+			tc := client.NewClient(conn)
+
+			// Verify connection
+			_, status := tc.GetClientId()
+			assert.Equal(t, status, msg.SUCCESS)
+
+			wg_setup.Done()
+
+			// Verify we can get relay indications
+			assert.Equal(t, []byte{255, 0}, (<-tc.Relays).Msg)
+
+			tc.Close()
+		}()
+	}
+
+	// Wait for all of the clients to connect
+	wg_setup.Wait()
+
+	// Start another client and send a relay message to all of the others
+	conn, err := net.Dial("tcp", serverAddr)
+	assert.Nil(t, err)
+	tc := client.NewClient(conn)
+	cids, status := tc.ListOtherClients()
+	assert.Equal(t, msg.SUCCESS, status)
+	csm, status := tc.RelayMessage([]byte{255, 0}, cids)
+	assert.Equal(t, msg.SUCCESS, status)
+	assert.Equal(t, 0, len(csm))
+
+	// Wait for all of the clients to exit
+	wg_done.Wait()
+	server.Close()
 }

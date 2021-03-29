@@ -4,6 +4,7 @@ Package server implements the user-facing API of a broadcast_hub server.
 package server
 
 import (
+	"log"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -45,7 +46,16 @@ func NewServer() *Server {
 
 // Add a listener which will accept new incoming connections automatically
 func (s *Server) AddListener(l net.Listener) {
-
+	go func() {
+		for {
+			con, err := l.Accept()
+			if err != nil {
+				log.Printf("Error: %s\n", err.Error())
+				break
+			}
+			s.addClientByConnection(con)
+		}
+	}()
 }
 
 // Close the server, and all associated resources and connections
@@ -130,19 +140,8 @@ func (s *Server) handleListRequest(sc *serverClient, mesg *msg.Message) {
 
 // Handle an incoming Relay Request Message
 func (s *Server) handleRelayRequest(sc *serverClient, mesg *msg.Message) {
-	/* Design thoughts:
-	 * 3 options come to mind:
-	 * 1. Iterate through all clients and write to all of them (No, far too io-bound)
-	 *
-	 * 2. Iterate through all clients and write to each of them in a new goroutine
-	 *    (No, boundless goroutine creation, difficult to throttle per destination)
-	 *
-	 * 3. Iterate through all clients' buffered channels, and send the message to each of them,
-	 *    if it can be done without blocking. Otherwise, fail.
-	 *    Slightly suboptimal use of network in simple case, but can trivially be enhanced
-	 *    to optimise latency & throughput (by running a second dispatcher goroutine per client
-	 *    if its important)
-	 */
+	// Iterate through all clients' buffered channels, and send the message to each of them,
+	// if it can be done without blocking. Otherwise, fail with NO_BUFFER.
 	rsp := msg.Message{
 		Version:   msg.MyVersion,
 		MessageId: mesg.MessageId,
@@ -151,20 +150,32 @@ func (s *Server) handleRelayRequest(sc *serverClient, mesg *msg.Message) {
 			StatusMap: make(msg.ClientStatusMap),
 		},
 	}
+	if len(mesg.RelayReq.Dest) > 255 || len(mesg.RelayReq.Msg) > 1024 {
+		rsp.RelayRes.Status = msg.TOO_LONG
+	} else {
+		rsp.RelayRes.StatusMap = s.sendRelays(sc, mesg)
+	}
+	sc.responseMsgs <- rsp
+}
+
+// Handle forwarding the relay messages to each individual destination
+func (s *Server) sendRelays(sc *serverClient, request *msg.Message) msg.ClientStatusMap {
+	statusMap := make(msg.ClientStatusMap)
 	ind := msg.RelayIndication{
 		Src: sc.cid,
-		Msg: mesg.RelayReq.Msg,
+		Msg: request.RelayReq.Msg,
 	}
-	for _, cid := range mesg.RelayReq.Dest {
+	for _, cid := range request.RelayReq.Dest {
 		s.clients_mutex.RLock()
 		dest_client, ok := s.clients[cid]
 		if !ok {
-			rsp.RelayRes.StatusMap[cid] = msg.INVALID_ID
+			statusMap[cid] = msg.INVALID_ID
 			s.clients_mutex.RUnlock()
 			continue
 		}
 		dest_chan := dest_client.relayMsgs
 		s.clients_mutex.RUnlock()
+
 		//Nonblocking send to buffered channel
 		select {
 		case dest_chan <- ind:
@@ -172,11 +183,11 @@ func (s *Server) handleRelayRequest(sc *serverClient, mesg *msg.Message) {
 			// The client will receive the relay indication soon, unless it disconnects first. (best effort relay)
 			// TODO: Do we want a better delivery guarantee?
 		default:
-			rsp.RelayRes.StatusMap[cid] = msg.NO_BUFFER
+			statusMap[cid] = msg.NO_BUFFER
 			continue
 		}
 	}
-	sc.responseMsgs <- rsp
+	return statusMap
 }
 
 // Add a new client connection
@@ -196,6 +207,7 @@ func (s *Server) addClientByConnection(c net.Conn) {
 	s.clients_mutex.Unlock()
 	s.startDispatcher(new_sc)
 	s.startSender(new_sc)
+	log.Printf("Added new Client %d\n", new_cid)
 }
 
 // Remove a client from server mapping
