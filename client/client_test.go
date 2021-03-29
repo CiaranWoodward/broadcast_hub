@@ -80,7 +80,7 @@ func TestClientListReq(t *testing.T) {
 	assert.Equal(t, []msg.ClientId{1, 2, 3, 4, 5}, cids)
 }
 
-func TestClientRelayReqReq(t *testing.T) {
+func TestClientRelayReq(t *testing.T) {
 	cli, ser := net.Pipe()
 
 	// Fake server to receive Relay request, verify it, and send a response
@@ -115,6 +115,34 @@ func TestClientRelayReqReq(t *testing.T) {
 	csm, status := tc.RelayMessage([]byte{0x00, 0x11, 0x22, 0x33}, []msg.ClientId{1, 2, 3, 4, 5})
 	assert.Equal(t, msg.SUCCESS, status)
 	assert.Equal(t, msg.ClientStatusMap{2: msg.INVALID_ID, 3: msg.CONNECTION_ERROR}, csm)
+}
+
+func TestClientRelayInd(t *testing.T) {
+	cli, ser := net.Pipe()
+
+	// Fake server to send the relay indication
+	go func() {
+		en := msg.CborTranscoder{}
+		ind := msg.Message{
+			Version:   msg.MyVersion,
+			MessageId: 1,
+			RelayInd: &msg.RelayIndication{
+				Src: msg.ClientId(888),
+				Msg: []byte{11, 22, 33},
+			},
+		}
+		indb, ok := en.Encode(ind)
+		assert.True(t, ok)
+		n, err := ser.Write(indb)
+		assert.Equal(t, len(indb), n)
+		assert.Nil(t, err)
+	}()
+
+	tc := NewClient(cli)
+	mesg, ok := <-tc.Relays
+	assert.True(t, ok)
+	assert.Equal(t, msg.ClientId(888), mesg.Src)
+	assert.Equal(t, []byte{11, 22, 33}, mesg.Msg)
 }
 
 func TestClientIdConnBreak(t *testing.T) {
