@@ -26,7 +26,7 @@ func TestServerAndClient(t *testing.T) {
 			defer wg.Done()
 
 			cli, ser := net.Pipe()
-			server.addClientByConnection(ser)
+			server.AddClientByConnection(ser)
 			tc := client.NewClient(cli)
 			cid, status := tc.GetClientId()
 			assert.Equal(t, msg.SUCCESS, status)
@@ -49,7 +49,7 @@ func TestServerAndClient(t *testing.T) {
 
 	// Add a final client that we will use for the list req
 	cli, ser := net.Pipe()
-	server.addClientByConnection(ser)
+	server.AddClientByConnection(ser)
 	tc := client.NewClient(cli)
 	cids, status := tc.ListOtherClients()
 	assert.Equal(t, msg.SUCCESS, status)
@@ -59,10 +59,14 @@ func TestServerAndClient(t *testing.T) {
 		assert.True(t, exists, "ID %d not in returned list", cid)
 	}
 
-	//Send a relay message to all other clients
+	//Send a relay message to all other clients, plus one invalid one
+	//Verify that it is correctly relayed to the non-invalid IDs
+	invalid_id := msg.ClientId(0x7621a3c5418eb972)
+	cids = append(cids, invalid_id)
 	csm, status := tc.RelayMessage([]byte{1, 2, 3, 4, 5}, cids)
 	assert.Equal(t, msg.SUCCESS, status)
-	assert.Equal(t, len(csm), 0)
+	assert.Equal(t, len(csm), 1)
+	assert.Equal(t, msg.INVALID_ID, csm[invalid_id])
 
 	wg.Wait()
 }

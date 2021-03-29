@@ -53,7 +53,7 @@ func (s *Server) AddListener(l net.Listener) {
 				log.Printf("Error: %s\n", err.Error())
 				break
 			}
-			s.addClientByConnection(con)
+			s.AddClientByConnection(con)
 		}
 	}()
 }
@@ -191,7 +191,7 @@ func (s *Server) sendRelays(sc *serverClient, request *msg.Message) msg.ClientSt
 }
 
 // Add a new client connection
-func (s *Server) addClientByConnection(c net.Conn) {
+func (s *Server) AddClientByConnection(c net.Conn) {
 	// Generate CID, add it to the map, start the dispatcher for it
 	new_cid := msg.ClientId(atomic.AddUint64((*uint64)(&s.cid), 1))
 	new_sc := serverClient{
