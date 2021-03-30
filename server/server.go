@@ -2,10 +2,10 @@
 Package server implements the user-facing API of a broadcast_hub server.
 
 Example, creating a listening TCP server on port 2593:
-  server := NewServer()
+  ser := server.NewServer()
   listener, err := net.Listen("tcp", ":2593")
   if err == nil {
-	  server.AddListener(listener)
+	  ser.AddListener(listener)
   }
 
 */

@@ -48,7 +48,7 @@ func runClient(c *cli.Context) error {
 	port := c.Int("port")
 	servername := c.String("server")
 
-	if port < 0 || port > 0xFFFF {
+	if port < 1 || port > 0xFFFF {
 		log.Fatalf("PORT out of range: %d", port)
 	}
 
@@ -69,9 +69,23 @@ func runClient(c *cli.Context) error {
 	}
 	log.Printf("Successfully connected to server %s, with CID %d.", endpoint, cid)
 
+	startPrinter(myClient)
 	startInteractive(myClient)
 
 	return nil
+}
+
+func startPrinter(c *client.Client) {
+	// Goroutine to print all incoming relays
+	go func() {
+		for {
+			rx, ok := <-c.Relays
+			if !ok {
+				break
+			}
+			fmt.Printf("Rx from %d: %s", rx.Src, rx.Msg)
+		}
+	}()
 }
 
 func printHelp() {
