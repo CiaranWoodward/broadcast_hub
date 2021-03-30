@@ -163,8 +163,11 @@ func startInteractive(c *client.Client) {
 
 		case "quit":
 			return
+		case "":
+			continue
 		default:
 			log.Printf("Unrecognised command \"%s\".\n", command)
+			printHelp()
 		}
 	}
 }
