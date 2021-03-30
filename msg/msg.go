@@ -37,7 +37,10 @@ Commands (with direction):
 */
 package msg
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
 // ClientId type, unique id per client
 type ClientId uint64
@@ -133,4 +136,25 @@ type Transcoder interface {
 // The StreamDecoder decodes and de-packetises messages from a stream
 type StreamDecoder interface {
 	DecodeNext() (msgout Message, ok bool)
+}
+
+func (s Status) String() string {
+	switch s {
+	case SUCCESS:
+		return "SUCCESS"
+	case INVALID_ID:
+		return "INVALID_ID"
+	case NO_BUFFER:
+		return "NO_BUFFER"
+	case CONNECTION_ERROR:
+		return "CONNECTION_ERROR"
+	case ENCODING_ERROR:
+		return "ENCODING_ERROR"
+	case TIMEOUT:
+		return "TIMEOUT"
+	case TOO_LONG:
+		return "TOO_LONG"
+	default:
+		return fmt.Sprintf("[Unknown Status: %d]", int(s))
+	}
 }
