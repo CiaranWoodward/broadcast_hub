@@ -1,3 +1,6 @@
+/*
+Basic CLI demonstrating the broadcast_hub client
+*/
 package main
 
 import (
@@ -14,8 +17,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// This entire file is
 func main() {
-	//Using urfave/cli to make sensible CLI argument parsing
+	//Using urfave/cli to give sensible CLI argument parsing
 	app := &cli.App{
 		Name:                   "client",
 		Usage:                  "The broadcast_hub client, for connecting to a server and communicating with other clients",
@@ -34,6 +38,11 @@ func main() {
 				Usage:    "Connect to the given `PORT` of the broadcast_hub server.",
 				Required: true,
 			},
+			&cli.IntFlag{
+				Name:  "roger_no",
+				Usage: "Create the given `COUNT` of dummy clients, which will respond back with a message whenever they are contacted",
+				Value: 0,
+			},
 		},
 	}
 
@@ -47,6 +56,7 @@ func main() {
 func runClient(c *cli.Context) error {
 	port := c.Int("port")
 	servername := c.String("server")
+	roger_no := c.Int("roger_no")
 
 	if port < 1 || port > 0xFFFF {
 		log.Fatalf("PORT out of range: %d", port)
@@ -58,6 +68,9 @@ func runClient(c *cli.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Create dummy clients alongside
+	createRogers(roger_no, endpoint)
 
 	// Bind to client
 	myClient := client.NewClient(con)
@@ -83,7 +96,7 @@ func startPrinter(c *client.Client) {
 			if !ok {
 				break
 			}
-			fmt.Printf("Rx from %d: %s", rx.Src, rx.Msg)
+			fmt.Printf("Rx from %d: %s\n", rx.Src, rx.Msg)
 		}
 	}()
 }
@@ -176,4 +189,35 @@ func relayCommandParse(args string) (cids []msg.ClientId, mesg []byte, err error
 		cids = append(cids, msg.ClientId(i))
 	}
 	return
+}
+
+func createRogers(n int, ep string) {
+	for i := 0; i < n; i++ {
+		go func() {
+			con, err := net.Dial("tcp", ep)
+			if err != nil {
+				log.Printf("Failed to create Roger #%d: %v", i, err)
+				return
+			}
+
+			// Bind to client
+			myClient := client.NewClient(con)
+			cid, status := myClient.GetClientId()
+			if status != msg.SUCCESS {
+				log.Fatal(status)
+			}
+			log.Printf("Successfully started Roger %d", cid)
+
+			// Loop forever responding to messages
+			for {
+				rx, ok := <-myClient.Relays
+				if !ok {
+					break
+				}
+				src := rx.Src
+				respm := fmt.Sprintf("Roger that %d - I am %d!", src, cid)
+				go myClient.RelayMessage([]byte(respm), []msg.ClientId{src})
+			}
+		}()
+	}
 }

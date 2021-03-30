@@ -1,3 +1,6 @@
+/*
+Basic CLI demonstrating the broadcast_hub server
+*/
 package main
 
 import (
